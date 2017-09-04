@@ -20,6 +20,14 @@ import (
 )
 
 var (
+	// DefaultSyslogConfig defines default values for Syslog configurations.
+	DefaultSyslogConfig = SyslogConfig{
+		NotifierConfig: NotifierConfig{
+			VSendResolved: true,
+		},
+		Message: `{{ template "log.default.message" . }}`,
+	}
+
 	// DefaultWebhookConfig defines default values for Webhook configurations.
 	DefaultWebhookConfig = WebhookConfig{
 		NotifierConfig: NotifierConfig{
@@ -263,6 +271,26 @@ func (c *HipchatConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 
 	return checkOverflow(c.XXX, "hipchat config")
+}
+
+// SyslogConfig configures notifications via a generic webhook.
+type SyslogConfig struct {
+	NotifierConfig `yaml:",inline" json:",inline"`
+
+	Message string `yaml:"message,omitempty" json:"message,omitempty"`
+
+	// Catches all undefined fields and must be empty after parsing.
+	XXX map[string]interface{} `yaml:",inline" json:"-"`
+}
+
+// UnmarshalYAML implements the yaml.Unmarshaler interface.
+func (c *SyslogConfig) UnmarshalYAML(unmarshal func(interface{}) error) error {
+	*c = DefaultSyslogConfig
+	type plain SyslogConfig
+	if err := unmarshal((*plain)(c)); err != nil {
+		return err
+	}
+	return checkOverflow(c.XXX, "log config")
 }
 
 // WebhookConfig configures notifications via a generic webhook.

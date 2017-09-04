@@ -148,6 +148,8 @@ func TestEmptyFieldsAndRegex(t *testing.T) {
 			PagerdutyURL:     "https://events.pagerduty.com/generic/2010-04-15/create_event.json",
 			OpsGenieAPIHost:  "https://api.opsgenie.com/",
 			VictorOpsAPIURL:  "https://alert.victorops.com/integrations/generic/20131114/alert/",
+			SyslogLocal:      "7",
+			SyslogAppname:    "alertmanager",
 		},
 
 		Templates: []string{

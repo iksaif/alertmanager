@@ -99,6 +99,10 @@ func BuildReceiverIntegrations(nc *config.Receiver, tmpl *template.Template) []I
 		}
 	)
 
+	for i, c := range nc.SyslogConfigs {
+		n := NewSyslog(c, tmpl)
+		add("log", i, n, c)
+	}
 	for i, c := range nc.WebhookConfigs {
 		n := NewWebhook(c, tmpl)
 		add("webhook", i, n, c)
@@ -137,6 +141,41 @@ func BuildReceiverIntegrations(nc *config.Receiver, tmpl *template.Template) []I
 const contentTypeJSON = "application/json"
 
 var userAgentHeader = fmt.Sprintf("Alertmanager/%s", version.Version)
+
+// Syslog implements a Notifier for generic sending logs.
+type Syslog struct {
+	conf *config.SyslogConfig
+	tmpl *template.Template
+	out  *syslog.Writer
+}
+
+// NewSyslog returns a new Syslog.
+func NewSyslog(conf *config.SyslogConfig, t *template.Template) *Syslog {
+	return &Syslog{conf: conf, tmpl: t}
+}
+
+// Notify implements the Notifier interface.
+func (n *Syslog) Notify(ctx context.Context, alerts ...*types.Alert) (bool, error) {
+	var err error
+	var msg string
+	var (
+		data     = n.tmpl.Data(receiverName(ctx), groupLabels(ctx), alerts...)
+		tmplText = tmplText(n.tmpl, data, &err)
+	)
+
+	key, ok := GroupKey(ctx)
+	if !ok {
+		log.Errorf("group key missing")
+	}
+
+	msg = tmplText(n.conf.Message)
+	if err != nil {
+		return false, err
+	}
+
+	n.out.With("incident", key).InfoF("%s", msg)
+	return true, err
+}
 
 // Webhook implements a Notifier for generic webhooks.
 type Webhook struct {

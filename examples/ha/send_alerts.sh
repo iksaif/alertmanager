@@ -32,7 +32,10 @@ alerts1='[
         "info": "The disk sda1 is running full",
         "summary": "please check the instance example2"
       }
-  },
+  }
+]'
+
+alerts2='[
   {
     "labels": {
        "alertname": "DiskRunningFull",
@@ -61,6 +64,7 @@ alerts1='[
      }
   }
 ]'
+
 curl -XPOST -d"$alerts1" http://localhost:9093/api/v1/alerts
-curl -XPOST -d"$alerts1" http://localhost:9094/api/v1/alerts
-curl -XPOST -d"$alerts1" http://localhost:9095/api/v1/alerts
+sleep 10
+curl -XPOST -d"$alerts2" http://localhost:9093/api/v1/alerts
