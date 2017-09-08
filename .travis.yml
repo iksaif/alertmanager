@@ -1,17 +1,42 @@
-sudo: false
-language: go
+sudo: required
 
 services:
 - docker
 
+language: go
+
 go:
 - 1.10.x
 
+go_import_path: github.com/prometheus/alertmanager
+
+install:
+#- git clone https://github.com/$TRAVIS_REPO_SLUG.git prometheus/alertmanager
+
 script:
+- VERSION=$(echo $TRAVIS_TAG | sed 's/^release-//' | sed 's/^v//')
+- 'if [ -n "$TRAVIS_TAG" ]; then echo "$VERSION" > VERSION; fi'
 # test front-end
 - make clean
 - cd ui/app/ && make && cd ../..
 - make assets
-- git diff --exit-code
+#- git diff --exit-code
 # test back-end
 - make
+
+before_deploy:
+- make promu
+- promu crossbuild
+- promu crossbuild tarballs
+- promu checksum .tarballs
+
+deploy:
+  provider: releases
+  api_key:
+    secure: Lv59KfxR1ZAX13u4ta/rTvE7J21w2U5J4cJSzwLIgwxDFS0hKlwNiR6soqm8ydkV92eopMSFOydZBO96BrcenjPEHIc/vicQEYoU+QYC3X+dEwcmZKD57TdWU3sFzUbrXo5d2ULbXM3XH2GF2AUpYeXdYVMAdm7Q1RWZC+zVQmhhceL0fhbLJ3XuDr0EzkAkk261OMVCMcdtCz79ymPfR9OIKF1R+S8l4I3Q5323X8gAVOhYZPkqtHHFfhuv51sZ+PmHKrCYzwdmt2yz7Lryke6oLGwxHe+akYdEPnGHYHIAyWRXrhkVSnGjwYPSkHyk0N8LBTsUeZP29tfO4Tfnv/9H6/wGIEeXWSyUBt+eSbMnnWYEUNPF0nMjic0qwNDgZavPLZvVWERpEg5dDPLUvV1cf7D+CBrzy49El5tbx4XRX0WrFMgneBxww8ZLSutXdWQ+V209HwrrVfKcnGzAh+fAoLrGhoXhhA2ZoxgaaJ/2LtNyZESuuEXzOT3oSrHeblBHvKC4qh0BJF9KaBbTLSfCZqPjLeBoac0cPA48JWFz11oTEkf21Pznzloh/TM8R/1QRUU1AlyVGwI+5VoGqVnk+DMH8YBSU2o4iEkb6C56VRW8ry6gaRNrrzoGnNhgg77E2vg/ATk6Neyz1LY+hMPyYtZ/xBSzP4dHf/H2Jp8=
+  file_glob: true
+  file: .tarballs/*
+  skip_cleanup: true
+  on:
+    tags: true
+    repo: criteo-forks/alertmanager
