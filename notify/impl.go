@@ -124,6 +124,32 @@ const contentTypeJSON = "application/json"
 
 var userAgentHeader = fmt.Sprintf("Alertmanager/%s", version.Version)
 
+// Log failed requests along with their responses.
+func logErrors(logger log.Logger, ctx context.Context, resp *http.Response, body []byte) {
+	if resp.StatusCode/100 >= 4 {
+		key, ok := GroupKey(ctx)
+		if !ok {
+			key = "group key missing"
+		}
+
+		var respBody, reqBody string
+
+		// Because the caller might not want us to read the response body body.
+		if body != nil {
+			respBody = string(body)
+		} else {
+			reqBodyBytes, _ := ioutil.ReadAll(resp.Body)
+			respBody = string(reqBodyBytes)
+		}
+		if resp.Request != nil {
+			reader, _ := resp.Request.GetBody()
+			reqBodyBytes, _ := ioutil.ReadAll(reader)
+			reqBody = string(reqBodyBytes)
+		}
+		level.Debug(logger).Log("msg", "Unexpected status code", "incident", key, "request", reqBody, "response", respBody)
+	}
+}
+
 // Webhook implements a Notifier for generic webhooks.
 type Webhook struct {
 	conf   *config.WebhookConfig
@@ -181,7 +207,9 @@ func (w *Webhook) Notify(ctx context.Context, alerts ...*types.Alert) (bool, err
 	if err != nil {
 		return true, err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+
+	logErrors(w.logger, ctx, resp, nil)
 
 	return w.retry(resp.StatusCode)
 }
@@ -708,10 +736,13 @@ func (n *Slack) Notify(ctx context.Context, as ...*types.Alert) (bool, error) {
 	}
 
 	resp, err := ctxhttp.Post(ctx, c, string(n.conf.APIURL), contentTypeJSON, &buf)
+
 	if err != nil {
 		return true, err
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+
+	logErrors(n.logger, ctx, resp, nil)
 
 	return n.retry(resp.StatusCode)
 }
@@ -949,7 +980,7 @@ func (n *Wechat) Notify(ctx context.Context, as ...*types.Alert) (bool, error) {
 	defer resp.Body.Close()
 
 	body, _ := ioutil.ReadAll(resp.Body)
-	level.Debug(n.logger).Log("msg", "response: "+string(body), "incident", key)
+	logErrors(n.logger, ctx, resp, body)
 
 	if resp.StatusCode != 200 {
 		return true, fmt.Errorf("unexpected status code %v", resp.StatusCode)
@@ -1021,6 +1052,7 @@ func (n *OpsGenie) Notify(ctx context.Context, as ...*types.Alert) (bool, error)
 	}
 	defer resp.Body.Close()
 
+	logErrors(n.logger, ctx, resp, nil)
 	return n.retry(resp.StatusCode)
 }
 
